@@ -63,7 +63,7 @@ type fakeResult struct {
 	urls []string
 }
 
-func (fetcher fakeFetcher) Fetch(url string) (string, []string, error) {
+func (fetcher fakeFetcher) Fetch(url string) (body string, urls []string, err error) {
 	fmt.Printf("\t\tFake-fetch: %v\n", url)
 
 	if res, ok := fetcher[url]; ok {
@@ -83,7 +83,7 @@ type cachedFetcher struct {
 }
 
 // Fetch retrieves the body and discovered URLs for the specified URL (using the cache if possible).
-func (fetcher *cachedFetcher) Fetch(url string) (string, []string, error) {
+func (fetcher *cachedFetcher) Fetch(url string) (body string, urls []string, err error) {
 	return fetcher.cache.getOrAdd(url, fetcher.innerFetcher)
 }
 
