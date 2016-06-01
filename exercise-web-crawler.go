@@ -9,37 +9,56 @@ import (
 // main is the main program entry-point.
 func main() {
 	channel := make(chan string)
+	waitGroup := &sync.WaitGroup{}
+	completion := &sync.Mutex{}
 
-	go Crawl("http://golang.org/", 4, fetcher, channel)
+	Crawl("http://golang.org/", 4, fetcher, channel, waitGroup)
 
-	for {
-		visitedURL, ok := <- channel
-		if !ok {
-			break
+	go func() {
+		fmt.Println("Starting to visit URLs.")
+		completion.Lock()
+
+		for {
+			visitedURL, ok := <-channel
+			if !ok {
+				break
+			}
+
+			fmt.Println("Visited URL: ", visitedURL)
 		}
 
-		fmt.Println("Visited URL: ", visitedURL)
-	}
+		fmt.Println("Done visiting.")
+		completion.Unlock()
+	}()
+
+	waitGroup.Wait()
+	fmt.Println("Crawl complete; closing channel.")
+	close(channel)
+	fmt.Println("Channel closed; main function terminating.")
+
+	completion.Lock()
 }
 
 // Crawl uses fetcher to recursively crawl pages starting with url, to a maximum of depth.
 // Each page crawled will be sent to the channel; when all pages have been crawled, the channel will be closed.
-func Crawl(url string, depth int, fetcher Fetcher, channel chan string) {
-	if depth <= 0 {
-		close(channel)
+func Crawl(url string, depth int, fetcher Fetcher, channel chan string, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
 
+	if depth <= 0 {
 		return
 	}
+
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	fmt.Printf("Found: %s %q\n", url, body)
-	for _, u := range urls {
-		go Crawl(u, depth-1, fetcher, channel)
+	for _, childUrl := range urls {
+		waitGroup.Add(1)
+		go Crawl(childUrl, depth-1, fetcher, channel, waitGroup)
 	}
-	return
 }
 
 //////////
